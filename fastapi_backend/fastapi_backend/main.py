@@ -13,9 +13,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-# tasks = []
-
-
 # @app.post("/tasks/", response_model=Task)
 # def create_task(task: Task):
 #     task.id = uuid4()
