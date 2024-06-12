@@ -1,0 +1,38 @@
+version: "3"  
+  
+services:  
+  fastapi_service:  
+    build:  
+      context: ./fastapi_backend
+      dockerfile: Dockerfile  
+    hostname: fastapi_backend_container  
+    container_name: fastapi_backend_container
+    depends_on:  
+      - db_postgres  
+    ports:  
+      - "8000:8000"   
+    networks:  
+      - task-management-app-network 
+  
+  db_postgres:  
+    image: postgres:alpine  
+    hostname: fastapi-postgres  
+    container_name: fastapi-postgres  
+    restart: on-failure  
+    environment:  
+      - POSTGRES_USER=postgres  
+      - POSTGRES_PASSWORD=postgres 
+    ports:  
+      - "5432:5432"  
+    volumes:  
+      - db-postgres:/var/lib/postgresql/data  
+    networks:  
+      - task-management-app-network 
+  
+volumes:  
+  db-postgres:  
+    driver: local  
+  
+networks:  
+  task-management-app-network:  
+    external: true

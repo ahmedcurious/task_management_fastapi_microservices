@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field
-from typing import Optional, List
+from typing import Optional
 
 class TaskBase(SQLModel):
     title: str = Field(max_length=255)
@@ -7,4 +7,4 @@ class TaskBase(SQLModel):
     completed: bool = False
 
 class Task(TaskBase, table=True):
-    id: int = Field(default=None, primary_key=True, index=True)
+    id: int = Field(default=None, primary_key=True)
