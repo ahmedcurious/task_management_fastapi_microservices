@@ -1,3 +1,0 @@
-docker run --name fastapi-postgres -e POSTGRES_PASSWORD=password -d -p 5432:5432 postgres:alpine
-
-create user ahmed with encrypted password 'password';
