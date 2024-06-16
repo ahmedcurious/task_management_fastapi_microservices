@@ -4,6 +4,9 @@ from contextlib import asynccontextmanager
 from sqlmodel import Session, select
 from .models import Task
 from .db import init_db, get_session
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+import asyncio
+import json
 
 
 @asynccontextmanager
