@@ -32,16 +32,6 @@ services:
       - task-management-app-network
 
 
-  adminer:
-    image: adminer
-    restart: always
-    depends_on:
-      - db_postgres
-    ports:
-      - 8080:8080
-    networks:
-      - task-management-app-network
-
   broker_kafka:
     image: bitnami/kafka
     hostname: broker_kafka
@@ -70,7 +60,7 @@ services:
     depends_on:
       - broker_kafka
     ports:
-      - 8081:8081
+      - 8080:8080
     environment:
       KAFKA_CLUSTERS_0_NAME: Local kafka Cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: broker_kafka:19092
