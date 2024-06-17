@@ -9,8 +9,38 @@ import asyncio
 import json
 
 
+async def consumer_kafka(topic, bootstrap_servers):
+    consumer = AIOKafkaConsumer(
+        topic=topic,
+        bootstrap_servers=bootstrap_servers,
+        group_id="my-group",
+        auto_offset_reset="earliest"
+    )
+
+    await consumer.start()
+    try:
+        async for message in consumer:
+            task_data = json.loads(message.value.decode("utf-8"))
+            print(f"Recieved Message: {task_data} on topic {message.topic}")
+    except asyncio.CancelledError:
+        pass
+    finally:
+        await consumer.stop()
+
+
+async def producer_kafka():
+    producer_var = AIOKafkaProducer(bootstrap_servers="broker_kafka:19092")
+    await producer_var.start()
+    try:
+        yield producer_var
+    finally:
+        await producer_var.stop()
+
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    asyncio.create_task(consumer_kafka("task_created", "broker_kafka:19092"))
     init_db()
     yield
 
@@ -19,7 +49,8 @@ app = FastAPI(lifespan=lifespan)
 
 @app.post("/tasks/", response_model=Task)
 async def create_task(task_data: Task,
-                      session: Session = Depends(get_session)
+                      session: Session = Depends(get_session),
+                      producer: AIOKafkaProducer = Depends(producer_kafka)
                       ):
     task = Task(title=task_data.title,
                 description=task_data.description, completed=task_data.completed)
@@ -57,11 +88,11 @@ async def update_individual_task(task_id: int,
     session.commit()
     session.refresh(task)
     return task
-    
+
 
 @app.delete("/tasks/{task_id}", response_model=Task)
 async def delete_individual_task(task_id: int,
-                           session: Session = Depends(get_session)):
+                                 session: Session = Depends(get_session)):
     task = session.get(Task, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task Not Found")
