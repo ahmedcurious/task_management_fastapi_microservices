@@ -9,9 +9,9 @@ import asyncio
 import json
 
 
-async def consumer_kafka(topic, bootstrap_servers):
+async def consumer_kafka(topics: List[str], bootstrap_servers):
     consumer = AIOKafkaConsumer(
-        topic,
+        *topics,
         bootstrap_servers=bootstrap_servers,
         group_id="my-group",
         auto_offset_reset="earliest"
@@ -20,8 +20,22 @@ async def consumer_kafka(topic, bootstrap_servers):
     await consumer.start()
     try:
         async for message in consumer:
-            task_data = json.loads(message.value.decode("utf-8"))
-            print(f"Recieved Message: {task_data} on topic {message.topic}")
+            if message.topic == "task_created":
+                task_created_message = json.loads(
+                    message.value.decode("utf-8"))
+                print(f"Recieved Message: {
+                      task_created_message} on topic {message.topic}")
+            elif message.topic == "task_updated":
+                task_updated_message = json.loads(
+                    message.value.decode("utf-8"))
+                print(f"Recieved Message: {
+                      task_updated_message} on topic {message.topic}")
+            else:
+                # Handle unexpected topics (optional)
+                unknown_topic_message = json.loads(
+                    message.value.decode("utf-8"))
+                print(f"Recieved Message: {
+                      unknown_topic_message} on topic {message.topic}")
     except asyncio.CancelledError:
         pass
     finally:
@@ -40,7 +54,8 @@ async def producer_kafka():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await asyncio.sleep(30)  # Add a 30-second delay
-    asyncio.create_task(consumer_kafka('task_created', 'broker_kafka:19092'))
+    asyncio.create_task(consumer_kafka(
+        ['task_created', 'task_updated'], 'broker_kafka:19092'))
     init_db()
     yield
 
@@ -82,7 +97,11 @@ async def read_individual_task(task_id: int,
 @app.put("/tasks/{task_id}", response_model=Task)
 async def update_individual_task(task_id: int,
                                  task_update: Task,
-                                 session: Session = Depends(get_session)):
+                                 session: Session = Depends(get_session),
+                                 producer: AIOKafkaProducer = Depends(producer_kafka)):
+    taskupdate_data = Task(title=task_update.title,
+                           description=task_update.description,
+                           completed=task_update.completed)
     task = session.get(Task, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task Not Found")
@@ -91,6 +110,11 @@ async def update_individual_task(task_id: int,
     task.completed = task_update.completed
     session.commit()
     session.refresh(task)
+    taskupdate_data_dictionary = taskupdate_data.model_dump()
+    taskupdate_data_json = json.dumps(
+        taskupdate_data_dictionary).encode("utf-8")
+    print(f"Updated Tasks Json: {taskupdate_data_json}")
+    await producer.send_and_wait('task_updated', taskupdate_data_json)
     return task
 
 
