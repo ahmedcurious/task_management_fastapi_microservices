@@ -11,7 +11,7 @@ import json
 
 async def consumer_kafka(topic, bootstrap_servers):
     consumer = AIOKafkaConsumer(
-        topic=topic,
+        topic,
         bootstrap_servers=bootstrap_servers,
         group_id="my-group",
         auto_offset_reset="earliest"
@@ -29,7 +29,7 @@ async def consumer_kafka(topic, bootstrap_servers):
 
 
 async def producer_kafka():
-    producer_var = AIOKafkaProducer(bootstrap_servers="broker_kafka:19092")
+    producer_var = AIOKafkaProducer(bootstrap_servers='broker_kafka:19092')
     await producer_var.start()
     try:
         yield producer_var
@@ -37,10 +37,10 @@ async def producer_kafka():
         await producer_var.stop()
 
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    asyncio.create_task(consumer_kafka("task_created", "broker_kafka:19092"))
+    await asyncio.sleep(30)  # Add a 30-second delay
+    asyncio.create_task(consumer_kafka('task_created', 'broker_kafka:19092'))
     init_db()
     yield
 
@@ -57,6 +57,10 @@ async def create_task(task_data: Task,
     session.add(task)
     session.commit()
     session.refresh(task)
+    task_dictionary = task.model_dump()
+    task_json = json.dumps(task_dictionary).encode("utf-8")
+    print(f"Tasks Json: {task_json}")
+    await producer.send_and_wait("task_created", task_json)
     return task
 
 

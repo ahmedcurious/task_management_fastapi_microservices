@@ -52,6 +52,8 @@ services:
       KAFKA_LOG_DIR: /tmp/kraft-combined-logs
       KAFKA_BROKER_ID: 1
       ALLOW_PLAINTEXT_LISTENER: yes
+    networks:
+      - task-management-app-network
 
 
   kafka_ui:
@@ -65,6 +67,8 @@ services:
       KAFKA_CLUSTERS_0_NAME: Local kafka Cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: broker_kafka:19092
       DYNAMIC_CONFIG_ENABLED: true
+    networks:
+      - task-management-app-network
     
 
 networks:
