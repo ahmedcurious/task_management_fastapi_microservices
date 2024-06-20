@@ -2,53 +2,14 @@ from fastapi import FastAPI, HTTPException, Depends
 from typing import List
 from contextlib import asynccontextmanager
 from sqlmodel import Session, select
-from .models import Task
+from .models import Task, User
 from .db import init_db, get_session
-from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from .kafka_logic import consumer_kafka, producer_kafka
+from aiokafka import AIOKafkaProducer
 import asyncio
 import json
-
-
-async def consumer_kafka(topics: List[str], bootstrap_servers):
-    consumer = AIOKafkaConsumer(
-        *topics,
-        bootstrap_servers=bootstrap_servers,
-        group_id="my-group",
-        auto_offset_reset="earliest"
-    )
-
-    await consumer.start()
-    try:
-        async for message in consumer:
-            if message.topic == "task_created":
-                task_created_message = json.loads(
-                    message.value.decode("utf-8"))
-                print(f"Recieved Message: {
-                      task_created_message} on topic {message.topic}")
-            elif message.topic == "task_updated":
-                task_updated_message = json.loads(
-                    message.value.decode("utf-8"))
-                print(f"Recieved Message: {
-                      task_updated_message} on topic {message.topic}")
-            else:
-                # Handle unexpected topics (optional)
-                unknown_topic_message = json.loads(
-                    message.value.decode("utf-8"))
-                print(f"Recieved Message: {
-                      unknown_topic_message} on topic {message.topic}")
-    except asyncio.CancelledError:
-        pass
-    finally:
-        await consumer.stop()
-
-
-async def producer_kafka():
-    producer_var = AIOKafkaProducer(bootstrap_servers='broker_kafka:19092')
-    await producer_var.start()
-    try:
-        yield producer_var
-    finally:
-        await producer_var.stop()
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from passlib.hash import bcrypt
 
 
 @asynccontextmanager
@@ -60,6 +21,20 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+
+@app.post("/users/", response_model=User)
+async def create_user(user_data: User,
+                      session: Session = Depends(get_session)
+                      ):
+    user = User(username=user_data.username,
+                passwordhash=bcrypt.hash(user_data.passwordhash))
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
 
 
 @app.post("/tasks/", response_model=Task)
