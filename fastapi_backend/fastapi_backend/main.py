@@ -3,13 +3,42 @@ from typing import List
 from contextlib import asynccontextmanager
 from sqlmodel import Session, select
 from .models import Task, User
-from .db import init_db, get_session
+from .db import init_db, get_session, engine
 from .kafka_logic import consumer_kafka, producer_kafka
 from aiokafka import AIOKafkaProducer
 import asyncio
 import json
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.hash import bcrypt
+from jose import jwt, JWTError
+from datetime import datetime, timedelta, timezone
+
+ALGORITHM = "HS256"
+SECRET_KEY = "My secure key"
+
+
+def create_access_token(subject: str, expires_delta: timedelta) -> str:
+    expire = datetime.now(timezone.utc) + expires_delta
+    to_encode = {"exp": expire, "sub": str(subject)}
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+def decode_access_token(access_token: str):
+    decoded_jwt = jwt.decode(access_token, SECRET_KEY, algorithms=ALGORITHM)
+    return decoded_jwt
+
+
+def authenticate_user(username: str,
+                      password: str):
+    with Session(engine) as session:
+        statement_user = select(User).where(User.username == username)
+        user_object = session.exec(statement=statement_user).first()
+        if username != user_object.username:
+            return False
+        if not user_object.verify_password(password=password):
+            return False
+        return user_object
 
 
 @asynccontextmanager
@@ -25,11 +54,26 @@ app = FastAPI(lifespan=lifespan)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
+@app.post("/login")
+async def token_generation(form_data: OAuth2PasswordRequestForm = Depends(OAuth2PasswordRequestForm)):
+    user = authenticate_user(username=form_data.username,
+                             password=form_data.password)
+    if not user:
+        return {'error': 'invalid credentials'}
+
+    access_token_expiry = timedelta(minutes=1)
+    acces_token = create_access_token(subject=user,
+                                      expires_delta=access_token_expiry)
+    return {"access_token": acces_token, "token_type": "bearer", "expires_in": access_token_expiry.total_seconds()}
+
+
 @app.post("/users/", response_model=User)
 async def create_user(user_data: User,
                       session: Session = Depends(get_session)
                       ):
-    user = User(username=user_data.username,
+    user = User(fullname=user_data.fullname,
+                email=user_data.email,
+                username=user_data.username,
                 passwordhash=bcrypt.hash(user_data.passwordhash))
     session.add(user)
     session.commit()

@@ -1,5 +1,6 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
+from passlib.hash import bcrypt
 
 class TaskBase(SQLModel):
     title: str = Field(max_length=255)
@@ -11,6 +12,8 @@ class Task(TaskBase, table=True):
 
 
 class UserBase(SQLModel):
+    fullname: str = Field(max_length=80)
+    email: str = Field(max_length=128)
     username: str = Field(max_length=64, unique=True)
     passwordhash: str = Field(max_length=128)
 
@@ -19,7 +22,7 @@ class UserBase(SQLModel):
         return cls.get(username=username)
     
     def verify_password(self, password):
-        return True
+        return bcrypt.verify(password, self.passwordhash)
 
 class User(UserBase, table=True):
     id: int = Field(default=None, primary_key=True)

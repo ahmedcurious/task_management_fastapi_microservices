@@ -16,6 +16,7 @@ psycopg2 = "^2.9.9"
 aiokafka = "^0.10.0"
 python-multipart = "^0.0.9"
 passlib = "^1.7.4"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
 
 
 [build-system]
