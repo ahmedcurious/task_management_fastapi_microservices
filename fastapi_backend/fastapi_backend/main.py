@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, status
 from typing import List
 from contextlib import asynccontextmanager
 from sqlmodel import Session, select
@@ -6,15 +6,17 @@ from .models import Task, User
 from .db import init_db, get_session, engine
 from .kafka_logic import consumer_kafka, producer_kafka
 from aiokafka import AIOKafkaProducer
-import asyncio
-import json
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.hash import bcrypt
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
+import asyncio
+import json
 
 ALGORITHM = "HS256"
 SECRET_KEY = "My secure key"
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 def create_access_token(subject: str, expires_delta: timedelta) -> str:
@@ -39,6 +41,25 @@ def authenticate_user(username: str,
         if not user_object.verify_password(password=password):
             return False
         return user_object
+    
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        user_token_data = decode_access_token(access_token=token)
+        with Session(engine) as session:
+            statement = select(User).where(User.username == user_token_data)
+            user_object = session.exec(statement).first()
+            if not user_object:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            return User.model_validate(user_object)
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e)
+        )
 
 
 @asynccontextmanager
@@ -49,12 +70,11 @@ async def lifespan(app: FastAPI):
     init_db()
     yield
 
+
 app = FastAPI(lifespan=lifespan)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-
-@app.post("/login")
+@app.post("/token")
 async def token_generation(form_data: OAuth2PasswordRequestForm = Depends(OAuth2PasswordRequestForm)):
     user = authenticate_user(username=form_data.username,
                              password=form_data.password)
@@ -78,6 +98,11 @@ async def create_user(user_data: User,
     session.add(user)
     session.commit()
     session.refresh(user)
+    return user
+
+
+@app.get("/users/me", response_model=User)
+async def get_user(user: User = Depends(get_current_user)):
     return user
 
 
