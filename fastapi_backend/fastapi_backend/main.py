@@ -1,65 +1,17 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends
 from typing import List
 from contextlib import asynccontextmanager
 from sqlmodel import Session, select
 from .models import Task, User
-from .db import init_db, get_session, engine
+from .db import init_db, get_session
+from .OAuth2_logic import create_access_token, authenticate_user, get_current_user
 from .kafka_logic import consumer_kafka, producer_kafka
 from aiokafka import AIOKafkaProducer
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
 from passlib.hash import bcrypt
-from jose import jwt, JWTError
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 import asyncio
 import json
-
-ALGORITHM = "HS256"
-SECRET_KEY = "My secure key"
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-
-def create_access_token(subject: str, expires_delta: timedelta) -> str:
-    expire = datetime.now(timezone.utc) + expires_delta
-    to_encode = {"exp": expire, "sub": str(subject)}
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-
-def decode_access_token(access_token: str):
-    decoded_jwt = jwt.decode(access_token, SECRET_KEY, algorithms=ALGORITHM)
-    return decoded_jwt
-
-
-def authenticate_user(username: str,
-                      password: str):
-    with Session(engine) as session:
-        statement_user = select(User).where(User.username == username)
-        user_object = session.exec(statement=statement_user).first()
-        if username != user_object.username:
-            return False
-        if not user_object.verify_password(password=password):
-            return False
-        return user_object
-    
-
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    try:
-        user_token_data = decode_access_token(access_token=token)
-        with Session(engine) as session:
-            statement = select(User).where(User.username == user_token_data)
-            user_object = session.exec(statement).first()
-            if not user_object:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="User not found"
-                )
-            return User.model_validate(user_object)
-    except JWTError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e)
-        )
 
 
 @asynccontextmanager
@@ -82,7 +34,7 @@ async def token_generation(form_data: OAuth2PasswordRequestForm = Depends(OAuth2
         return {'error': 'invalid credentials'}
 
     access_token_expiry = timedelta(minutes=1)
-    acces_token = create_access_token(subject=user,
+    acces_token = create_access_token(subject=user.username,
                                       expires_delta=access_token_expiry)
     return {"access_token": acces_token, "token_type": "bearer", "expires_in": access_token_expiry.total_seconds()}
 
