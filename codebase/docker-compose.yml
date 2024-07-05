@@ -12,9 +12,11 @@ services:
       - db_postgres
       - broker_kafka
     ports:
-      - "8000:8000"
+      - "8085:8085"
     networks:
       - task-management-app-network
+    volumes:
+      - ./fastapi_backend:/app #Sync local directory with the container directory
   
 
   db_postgres:
@@ -30,6 +32,8 @@ services:
       - "5432:5432"
     networks:
       - task-management-app-network
+    volumes:
+      - db_postgres:/var/lib/postgresql/data
 
 
   broker_kafka:
@@ -70,6 +74,11 @@ services:
     networks:
       - task-management-app-network
     
+
+volumes:
+  db_postgres:
+    driver: local
+
 
 networks:
   task-management-app-network:

@@ -1,7 +1,6 @@
 FROM python:3.12-slim
 
 
-# Define environment variables for Python and Poetry
 ENV PYTHONDONTWRITEBYTECODE=1 \ 
     # Disable bytecode generation to prevent issues with the container's file system
     PYTHONUNBUFFERED=1 \
@@ -20,7 +19,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     # Set POETRY_NO_INTERACTION to prevent Poetry from prompting the user for input.
     POETRY_VIRTUALENVS_CREATE=false \
     # Create a new virtual environment when running 'poetry init'.
-    POETRY_CACHE_DIR=/tmp/poetry_cache \
+    POETRY_CACHE_DIR='/tmp/poetry_cache' \
     # Set the cache directory for Poetry to /tmp/poetry_cache.
     POETRY_HOME='/usr/local'  \
     # Set the Poetry home directory to /opt/poetry.
@@ -45,4 +44,4 @@ RUN poetry install
 
 EXPOSE 8000
 
-CMD [ "poetry", "run", "uvicorn", "fastapi_backend.main:app", "--host", "0.0.0.0", "--reload" ]
+CMD [ "poetry", "run", "uvicorn", "fastapi_backend.main:app", "--host", "0.0.0.0", "--port", "8085", "--reload" ]
