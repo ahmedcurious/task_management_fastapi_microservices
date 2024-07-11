@@ -23,7 +23,15 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan,
+              title="Task Management API with DB",
+              version="0.0.1",
+              root_path="/task_manager")
+
+
+@app.get("/")
+def welcome_message():
+    return {"message": "Welcome to task_manager API Root. API working successfully"}
 
 
 @app.post("/token")
